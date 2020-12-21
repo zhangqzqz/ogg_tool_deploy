@@ -72,26 +72,26 @@ def parse_prm_rep(tag_args,tag_other_args):
 @log
 def create_dir(os_args,vali_args,_REMOTE_COMMAND):
     db_user,db_passwd,db_port,dmp_dir = vali_args
-    print("\nINFO:创建数据库目录MC_EXPDP")
+    print("\nINFO:创建数据库目录OPS_EXPDP")
     
     check_dir_res = ''.join(ssh_input(os_args,f"ls {dmp_dir}"))
     if 'No such file or directory' in check_dir_res:
         print("\nWARRING:该路径不存在，请检查系统环境！")
         return 0
-    create_dir_sql = '''create or replace directory mc_expdp as '%s';
- grant read,write on directory mc_expdp to %s;
+    create_dir_sql = '''create or replace directory ops_expdp as '%s';
+ grant read,write on directory ops_expdp to %s;
 '''%(dmp_dir,db_user)
 
     create_dir_res = ssh_input(os_args,_REMOTE_COMMAND %create_dir_sql)
-    check_sql = "select * from dba_directories where DIRECTORY_NAME = 'MC_EXPDP';"
+    check_sql = "select * from dba_directories where DIRECTORY_NAME = 'OPS_EXPDP';"
     if 'fail' not in create_dir_res:
         check_res = ssh_input(os_args,_REMOTE_COMMAND %check_sql)
 
-        print(f"\nINFO:数据库目录MC_EXPDP：{dmp_dir} 创建成功")
+        print(f"\nINFO:数据库目录OPS_EXPDP：{dmp_dir} 创建成功")
         
         return 'create dir s'
     else:
-        print(f"\nWARRING:数据库目录MC_EXPDP：{dmp_dir} 创建失败")
+        print(f"\nWARRING:数据库目录OPS_EXPDP：{dmp_dir} 创建失败")
         return 'create dir f'
 
 

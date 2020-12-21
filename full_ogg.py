@@ -14,19 +14,19 @@ from logging_method import log
 def start_prc(src_args,tag_args,src_cmd_args,_REMOTE_GGSCI_COMMAND):
     _REMOTE_GGSCI_COMMAND = _REMOTE_GGSCI_COMMAND % (src_cmd_args[0],src_cmd_args[1],src_cmd_args[2],src_cmd_args[2],src_cmd_args[2])
     # start ext and dmp
-    start_ext_cmd = _REMOTE_GGSCI_COMMAND % "start mc_ext"
+    start_ext_cmd = _REMOTE_GGSCI_COMMAND % "start %s_ext" %src_cmd_args[6]
     start_ext_res = ssh_input(src_args,start_ext_cmd)
     print('\n'.join(start_ext_res))
     
     time.sleep(10)
-    select_trailfile_cmd = "ls %s/dirdat/mc*"%src_cmd_args[2]
+    select_trailfile_cmd = "ls %s/dirdat/%s*"%(src_cmd_args[2],src_cmd_args[6]
     trailfile_res = ssh_input(src_args,select_trailfile_cmd)[0]
     if 'No such file or directory' in trailfile_res:
         print("The trail file have not generate.")
         return "trail file generate error."
         os._exit(0)
     else:
-        start_dmp_cmd = _REMOTE_GGSCI_COMMAND % "start mc_dmp"
+        start_dmp_cmd = _REMOTE_GGSCI_COMMAND % "start %s_dmp" %src_cmd_args[6]
         start_dmp_res = ssh_input(src_args,start_dmp_cmd)
         print('\n'.join(start_dmp_res))
         return "process start succees"
@@ -148,7 +148,7 @@ EOF'''%(tag_cmd_args[0],tag_cmd_args[1],schemas,dmp_file,imp_time)
 
     # start process of replicate
 
-    start_rep_cmd = 'start mc_rep atcsn %s' %scn
+    start_rep_cmd = 'start %s_rep atcsn %s' %(tag_cmd_args[6],scn)
    
 
     # # get os system 

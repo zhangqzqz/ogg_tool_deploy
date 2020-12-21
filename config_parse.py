@@ -30,8 +30,8 @@ def get_init_args(item):
         asm_passwd = config.get('ogg_init_config','tag_sysasm_passwd')
         dmp_dir = config.get('ogg_init_config','tag_dmp_dir')
 
-
-    init_args = [sync_segments,asm_passwd,dmp_dir]
+    project_name = config.get(item,'project_name')
+    init_args = [sync_segments,asm_passwd,dmp_dir,project_name]
 
     return init_args
 
@@ -42,6 +42,7 @@ def get_other_args(item):
     ora_user = config.get(item,'oracle_user')
     sid = config.get(item,'sid')
     ogg_dir = config.get(item,'ogg_dir')
+  
 
     os_args = [ora_user,sid,ogg_dir]
 

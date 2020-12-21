@@ -11,10 +11,11 @@ oracle 自动化运维工具
 | 张全针 | v2.1 | 2020/05/18 | 添加全量传输scp功能及其他优化       |
 | 张全针 | v3.0 | 2020/05/25 | 添加表重新初始化功能|
 | 张全针 | v4.0 | 2020/06/22 | 添加附加日志管理功能|
+| 张全针 | v5.0 | 2020/12/21 | 添加自定义进程名功能|
 
 
 ## 定位
-        给MC公司内部人员使用，提供自动化运维功能，提高工作效率
+        提供自动化运维功能，提高工作效率
 
 
 ## 先决条件
@@ -91,7 +92,7 @@ python 3 64位
      host=192.168.238.36
      user=root
      port=22
-     password=hzmcdba
+     password=hzopsdba
      oracle_user=oracle
      sid=ora11g2
      ogg_dir=/oradata/ogg
@@ -101,7 +102,7 @@ python 3 64位
      host=192.168.238.56
      user=root
      port=22
-     password=hzmcdba
+     password=hzopsdba
      oracle_user=oracle
      sid=orcl
      ogg_dir=/ogg
@@ -115,8 +116,8 @@ python 3 64位
      tag_dmp_dir=/ogg
 
      [ogg_validate_config]                                            --ogg切换前检查参数
-     src_ogg_user=mc_odc
-     src_ogg_passwd=mc_odc
+     src_ogg_user=ops_odc
+     src_ogg_passwd=ops_odc
      src_db_port=1521
      tag_dmp_dir=/ogg
 
@@ -124,9 +125,9 @@ python 3 64位
      [ogg_reinitial_config]                                           --ogg表初始化功能参数
      reinital_tables=zqz.zqz1,zmy.zqz1
      src_db_port=1521
-     src_ogg_user=mc_odc
-     src_ogg_passwd=mc_odc
-     ogg_rep=mc_rep
+     src_ogg_user=ops_odc
+     src_ogg_passwd=ops_odc
+     ogg_rep=ops_rep
      tag_dmp_dir=/ogg
 
 
@@ -136,7 +137,7 @@ python 3 64位
                                                                         该参数可选，如果没有提供，则默认添加抽取进程中配置的所有用户或表的附加日志。
      os_type=linux
      db_type=oracle
-     ogg_ext_name=mc_ext
+     ogg_ext_name=ops_ext
      ext_object=zqz.t1,zmy.zqz1
 
 

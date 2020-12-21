@@ -22,17 +22,17 @@ EOF
     dir_sql = _REMOTE_COMMAND %"SELECT distinct(REVERSE(SUBSTR(REVERSE(d.file_name),INSTR(REVERSE(d.file_name),'/')+1))) \
                     from dba_data_files d,dual;"
     db_dir = ssh_input(tag_args,dir_sql)[0].replace('\n','')
-    create_user_sql = '''create tablespace mc_odc_tps datafile '%s/mc_odc01.dbf' size 100M autoextend on;
-create user mc_odc identified by mc_odc default tablespace mc_odc_tps;
-GRANT CONNECT TO mc_odc;
-GRANT ALTER ANY TABLE TO mc_odc;
-GRANT ALTER SESSION TO mc_odc;
-GRANT CREATE SESSION TO mc_odc;
-GRANT FLASHBACK ANY TABLE TO mc_odc;
-GRANT SELECT ANY DICTIONARY TO mc_odc;
-GRANT SELECT ANY TABLE TO mc_odc;
-GRANT RESOURCE TO mc_odc;
-GRANT DBA TO mc_odc;'''%db_dir
+    create_user_sql = '''create tablespace ops_odc_tps datafile '%s/ops_odc01.dbf' size 100M autoextend on;
+create user ops_odc identified by ops_odc default tablespace ops_odc_tps;
+GRANT CONNECT TO ops_odc;
+GRANT ALTER ANY TABLE TO ops_odc;
+GRANT ALTER SESSION TO ops_odc;
+GRANT CREATE SESSION TO ops_odc;
+GRANT FLASHBACK ANY TABLE TO ops_odc;
+GRANT SELECT ANY DICTIONARY TO ops_odc;
+GRANT SELECT ANY TABLE TO ops_odc;
+GRANT RESOURCE TO ops_odc;
+GRANT DBA TO ops_odc;'''%db_dir
     ssh_input(tag_args,_REMOTE_COMMAND % create_user_sql)
 
     # create subdirs
@@ -49,11 +49,11 @@ rm -f %s/dirprm/mgr.prm
 rm -f %s/GLOBALS
 echo 'port 7809
 DYNAMICPORTLIST 7800-7810
-PURGEOLDEXTRACTS ./dirdat/mc*, USECHECKPOINTS, MINKEEPHOURS 24
+PURGEOLDEXTRACTS ./dirdat/%s*, USECHECKPOINTS, MINKEEPHOURS 24
 autorestart extract * retries 10 waitminutes 10'>>%s/dirprm/mgr.prm
-echo 'GGSCHEMA mc_odc
-CHECKPOINTTABLE mc_odc.ggs_checkpoint '>>%s/GLOBALS
-EOF'''%(tag_cmd_args[0],tag_cmd_args[1],tag_cmd_args[2],tag_cmd_args[2],tag_cmd_args[2],tag_cmd_args[2])
+echo 'GGSCHEMA ops_odc
+CHECKPOINTTABLE ops_odc.ggs_checkpoint '>>%s/GLOBALS
+EOF'''%(tag_cmd_args[0],tag_cmd_args[1],tag_cmd_args[2],tag_cmd_args[2],tag_cmd_args[6],tag_cmd_args[2],tag_cmd_args[2])
     ssh_input(tag_args,create_mgr_cmd)
     start_mgr_cmd = _REMOTE_GGSCI_COMMAND % "start mgr"
     start_mgr_res = ssh_input(tag_args,start_mgr_cmd)
@@ -65,7 +65,7 @@ EOF'''%(tag_cmd_args[0],tag_cmd_args[1],tag_cmd_args[2],tag_cmd_args[2],tag_cmd_
 su - %s <<EOF
 export ORACLE_SID=%s
 cd %s
-sqlplus -s mc_odc/mc_odc
+sqlplus -s ops_odc/ops_odc
 @chkpt_ora_create.sql
 exit
 EOF
@@ -77,7 +77,7 @@ EOF
 
     # create the process replicate.
     print("######Create the process replicate.")
-    add_rep_cmd = _REMOTE_GGSCI_COMMAND % "dblogin userid mc_odc password mc_odc\nadd replicat mc_rep exttrail ./dirdat/mc"
+add_rep_cmd = _REMOTE_GGSCI_COMMAND % f"dblogin userid ops_odc password ops_odc\nadd replicat {tag_cmd_args[6]}_rep exttrail ./dirdat/{tag_cmd_args[6]}"
     add_rep_res = ssh_input(tag_args,add_rep_cmd)
     print(''.join(add_rep_res))
     
@@ -86,10 +86,10 @@ EOF
     edit_rep_cmd = '''
 su - %s <<EOF
 export ORACLE_SID=%s
-rm -f %s/dirprm/mc_rep.prm
-echo 'replicat mc_rep
+rm -f %s/dirprm/%s_rep.prm
+echo 'replicat %s_rep
 setenv (NLS_LANG="SIMPLIFIED CHINESE_CHINA.ZHS16GBK")
-userid mc_odc, password mc_odc
+userid ops_odc, password ops_odc
 ASSUMETARGETDEFS
 ALLOWNOOPUPDATES
 DBOPTIONS DEFERREFCONST
@@ -100,10 +100,10 @@ ddlerror 1917 ignore
 ddlerror 24344 ignore
 ddlerror 1031 ignore
 ddl include mapped
-DISCARDFILE %s/dirrpt/mc.dsc, APPEND megabytes 20
+DISCARDFILE %s/dirrpt/%s.dsc, APPEND megabytes 20
 DISCARDROLLOVER on sunday
-%s'>>%s/dirprm/mc_rep.prm
-EOF'''%(tag_cmd_args[0],tag_cmd_args[1],tag_cmd_args[2],tag_cmd_args[2],map_obj_cmd,tag_cmd_args[2])
+%s'>>%s/dirprm/%s_rep.prm
+EOF'''%(tag_cmd_args[0],tag_cmd_args[1],tag_cmd_args[2],tag_cmd_args[6],tag_cmd_args[6],tag_cmd_args[2],tag_cmd_args[6],map_obj_cmd,tag_cmd_args[2],tag_cmd_args[6])
 
     edit_rep_res = ssh_input(tag_args,edit_rep_cmd)
 

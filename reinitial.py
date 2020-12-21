@@ -125,7 +125,7 @@ def impdp_tag(src_args,tag_args,tag_other_args,reinit_args,scn,_REMOTE_COMMAND,_
             
             impdp_cmd = '''su - %s <<EOF
 export ORACLE_SID=%s
-impdp "'"/ as sysdba"'"   tables=%s directory=mc_expdp logfile=imptabs_ogg_%s.log network_link= mc_dblink table_exists_action=replace exclude=jobs,trigger	 flashback_scn=%s
+impdp "'"/ as sysdba"'"   tables=%s directory=ops_expdp logfile=imptabs_ogg_%s.log network_link= ops_dblink table_exists_action=replace exclude=jobs,trigger	 flashback_scn=%s
 EOF'''%(tag_other_args[0],tag_other_args[1],reinitial_tables,imp_time,scn)
             print("\nINFO:目标库开始导入：")
             print(impdp_cmd)

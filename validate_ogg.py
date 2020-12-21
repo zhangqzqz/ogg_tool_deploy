@@ -17,15 +17,15 @@ def create_dblink(src_os_args,tag_os_args,vali_args,_REMOTE_COMMAND,_REMOTE_TAG_
     print("\nINFO:源端数据库服务名为: %s\n"%srv_name)
 
     create_dblink_sql = '''
-    create public  database link mc_dblink
+    create public  database link ops_dblink
 connect to %s identified by %s
 using '(DESCRIPTION =(ADDRESS_LIST =(ADDRESS =(PROTOCOL = TCP)(HOST = %s)(PORT = %s)))(CONNECT_DATA =(SERVICE_NAME = %s)))';
 '''%(src_ogg_user,src_ogg_passwd,src_os_args[0],src_db_port,srv_name)
 
 
-    check_dblink_sql = "select open_mode from v\$database@mc_dblink;"
+    check_dblink_sql = "select open_mode from v\$database@ops_dblink;"
  
-    ssh_input(tag_os_args,_REMOTE_TAG_COMMAND % "drop public  database link mc_dblink;")
+    ssh_input(tag_os_args,_REMOTE_TAG_COMMAND % "drop public  database link ops_dblink;")
     ssh_input(tag_os_args,_REMOTE_TAG_COMMAND % create_dblink_sql)
     check_dblink = ssh_input(tag_os_args,_REMOTE_TAG_COMMAND % check_dblink_sql)
 
@@ -40,20 +40,20 @@ using '(DESCRIPTION =(ADDRESS_LIST =(ADDRESS =(PROTOCOL = TCP)(HOST = %s)(PORT =
 
 # 获取两端数量不一致的对象，并处理
 # 此步骤获取两端除了trigger、job、view、lob、table以外其他对象的不一致情况。
-# 输出不一致信息到 mc_check_detail.txt  //辅助判断
-# 输出不一致表的修复语句到 mc_check.sql  //人工检查之后执行修复
+# 输出不一致信息到 ops_check_detail.txt  //辅助判断
+# 输出不一致表的修复语句到 ops_check.sql  //人工检查之后执行修复
 @log
 def get_inconsist_obj(os_args,sync_users,_REMOTE_TAG_COMMAND):
     sync_users_str = str(tuple(sync_users)).upper().replace(',)',')')
-    create_count_tb_sql = '''drop table mc_count;
-create table mc_count(OWNER,OBJECT_TYPE,total) as
+    create_count_tb_sql = '''drop table ops_count;
+create table ops_count(OWNER,OBJECT_TYPE,total) as
 SELECT D.OWNER, D.OBJECT_TYPE, COUNT(*)
-FROM dba_objects@mc_dblink d
+FROM dba_objects@ops_dblink d
 WHERE d.OWNER in %s
 and d.object_type not in ('TRIGGER', 'JOB', 'VIEW', 'LOB','TABLE')
 and object_name not like 'MLOG%%'
 AND NOT EXISTS (SELECT *
-    FROM DBA_RECYCLEBIN@mc_dblink B
+    FROM DBA_RECYCLEBIN@ops_dblink B
     WHERE B.object_name = D.OBJECT_NAME
       AND D.OWNER = B.owner)
 GROUP BY D.OWNER, D.OBJECT_TYPE
@@ -69,7 +69,7 @@ AND NOT EXISTS (SELECT *
       AND D.OWNER = B.owner)
 GROUP BY D.OWNER, D.OBJECT_TYPE;'''%(sync_users_str,sync_users_str)
 
-    select_count_sql='select * from mc_count;'
+    select_count_sql='select * from ops_count;'
     ssh_input(os_args,_REMOTE_TAG_COMMAND % create_count_tb_sql)
     select_count_res = ssh_input(os_args,_REMOTE_TAG_COMMAND % select_count_sql)
     if select_count_res !=[] :
@@ -111,16 +111,16 @@ def get_diff_obj_info(src_args,tag_args,get_obj_info_sql,obj_type,_REMOTE_COMMAN
         title =[f'{obj_type} 名',f'{obj_type} 用户名','状态']
     if get_obj_info_sql =='':
         get_obj_info_sql = '''select distinct s.name, s.owner, b.status
-    from dba_source@mc_dblink s, dba_objects@mc_dblink b
+    from dba_source@ops_dblink s, dba_objects@ops_dblink b
     where s.name = b.object_name
     and b.object_type = '%s'
-    and s.owner in (select owner from mc_count where OBJECT_TYPE='%s')
+    and s.owner in (select owner from ops_count where OBJECT_TYPE='%s')
     minus
     select distinct s.name, s.owner, b.status
     from dba_source s, dba_objects b
     where s.name = b.object_name
     and b.object_type = '%s'
-    and s.owner in (select owner from mc_count where OBJECT_TYPE='%s');
+    and s.owner in (select owner from ops_count where OBJECT_TYPE='%s');
         '''%(obj_type,obj_type,obj_type,obj_type)
     else:
         pass
@@ -128,9 +128,9 @@ def get_diff_obj_info(src_args,tag_args,get_obj_info_sql,obj_type,_REMOTE_COMMAN
     obj_list = get_ssh_list(get_obj_res)
 
     if obj_list != []:
-        print(f"\nINFO: 目标库缺失的{obj_type} 具体信息请查看本地 mc_check_detail.txt文件：")
+        print(f"\nINFO: 目标库缺失的{obj_type} 具体信息请查看本地 ops_check_detail.txt文件：")
         table_res = res_table(obj_list,title)
-        with open('mc_check_detail.txt','a+',encoding='utf-8') as file:
+        with open('ops_check_detail.txt','a+',encoding='utf-8') as file:
             file.write(f"\nINFO: 目标库缺失的{obj_type} 具体信息:\n{table_res}\n")
 
         ## 获取缺失对象的ddl语句
@@ -138,8 +138,8 @@ def get_diff_obj_info(src_args,tag_args,get_obj_info_sql,obj_type,_REMOTE_COMMAN
             for obj in obj_list:
                 obj_name,obj_owner,_ = obj
                 ddl_res = get_ddl_info(src_args,obj_name,obj_owner,obj_type,_REMOTE_COMMAND)
-                ssh_input(tag_args,f'''echo "{ddl_res}" >> /tmp/mc_check.sql''')
-            print(f"\nINFO: 目标库缺失{obj_type}的ddl语句请在目标端查看 /tmp/mc_check.sql 文件 ")
+                ssh_input(tag_args,f'''echo "{ddl_res}" >> /tmp/ops_check.sql''')
+            print(f"\nINFO: 目标库缺失{obj_type}的ddl语句请在目标端查看 /tmp/ops_check.sql 文件 ")
 
             
     else:
@@ -152,13 +152,13 @@ def get_diff_obj_info(src_args,tag_args,get_obj_info_sql,obj_type,_REMOTE_COMMAN
 def index_vali(src_args,tag_args,_REMOTE_COMMAND,_REMOTE_TAG_COMMAND):
     get_diff_index_count_sql = '''
 select TABLE_OWNER, TABLE_NAME, COUNT(*)
-  from DBA_INDEXES@mc_dblink
- where owner in (select owner from mc_count where OBJECT_TYPE='INDEX')
+  from DBA_INDEXES@ops_dblink
+ where owner in (select owner from ops_count where OBJECT_TYPE='INDEX')
  group by table_owner, table_name
 minus
 select TABLE_OWNER, TABLE_NAME, COUNT(*)
   from DBA_INDEXES
- where owner in (select owner from mc_count where OBJECT_TYPE='INDEX')
+ where owner in (select owner from ops_count where OBJECT_TYPE='INDEX')
  group by table_owner, table_name;'''
  
     get_diff_index_info_sql = '''
@@ -168,7 +168,7 @@ select index_owner,
        table_owner,
        table_name,
        listagg(to_char(column_name), ',') within group(order by index_name) as full_column
-  from DBA_IND_COLUMNS@mc_dblink
+  from DBA_IND_COLUMNS@ops_dblink
  where table_owner = '%s'
    and table_name = '%s'
  group by index_owner, index_name, table_owner, table_name
@@ -201,14 +201,14 @@ select index_owner,
         ddl_res = get_ddl_info(src_args,ind_name,ind_owner,'INDEX',_REMOTE_COMMAND)
 
         ind_ddl_list.append(ddl_res)
-    print(f"\nINFO: 目标库缺失的索引具体信息请查看本地 mc_check_detail.txt文件：")
+    print(f"\nINFO: 目标库缺失的索引具体信息请查看本地 ops_check_detail.txt文件：")
     title = ['索引用户名','索引名','表用户名','表名','列名']
 
     table_res = res_table(ind_res_list,title)
-    with open('mc_check_detail.txt','a+',encoding='utf-8') as file:
+    with open('ops_check_detail.txt','a+',encoding='utf-8') as file:
         file.write(f"\nINFO: 目标库缺失的INDEX 具体信息:\n{table_res}\n")
-    ssh_input(tag_args,f'''echo "{''.join(ind_ddl_list)}" >> /tmp/mc_check.sql''')
-    print(f"\nINFO: 目标库缺失 INDEX 的ddl语句请在目标端查看 /tmp/mc_check.sql 文件 ")
+    ssh_input(tag_args,f'''echo "{''.join(ind_ddl_list)}" >> /tmp/ops_check.sql''')
+    print(f"\nINFO: 目标库缺失 INDEX 的ddl语句请在目标端查看 /tmp/ops_check.sql 文件 ")
 
     return ind_res_list
 
@@ -246,16 +246,16 @@ def pkg_body_vali(src_args,tag_args,_REMOTE_COMMAND,_REMOTE_TAG_COMMAND):
 def synonym_vali(src_args,tag_args,_REMOTE_COMMAND,_REMOTE_TAG_COMMAND):
     get_obj_sql = '''
     select  s.synonym_name,s.owner,b.status
-  from dba_synonyms@mc_dblink s, dba_objects@mc_dblink b
+  from dba_synonyms@ops_dblink s, dba_objects@ops_dblink b
  where s.synonym_name = b.object_name
    and b.object_type = 'SYNONYM'
-   and s.owner in (select owner from mc_count where OBJECT_TYPE='SYNONYM')
+   and s.owner in (select owner from ops_count where OBJECT_TYPE='SYNONYM')
 minus
 select  s.synonym_name,s.owner,  b.status
   from dba_synonyms s, dba_objects b
  where s.synonym_name = b.object_name
    and b.object_type = 'SYNONYM'
-   and s.owner in (select owner from mc_count where OBJECT_TYPE='SYNONYM');'''
+   and s.owner in (select owner from ops_count where OBJECT_TYPE='SYNONYM');'''
     synonym_list = get_diff_obj_info(src_args,tag_args,get_obj_sql,'SYNONYM',_REMOTE_COMMAND,_REMOTE_TAG_COMMAND)
     return synonym_list
 
@@ -266,7 +266,7 @@ def table_vali(src_args,tag_args,sync_users,_REMOTE_COMMAND,_REMOTE_TAG_COMMAND)
     sync_users_str = str(tuple(sync_users)).upper().replace(',)',')')
     get_table_sql = '''
     select  table_name,owner,STATUS
-    from dba_tables@mc_dblink
+    from dba_tables@ops_dblink
     where owner not in %s
     minus
     select table_name,owner,STATUS
@@ -280,7 +280,7 @@ def lob_vali(src_args,tag_args,sync_users,_REMOTE_COMMAND,_REMOTE_TAG_COMMAND):
     sync_users_str = str(tuple(sync_users)).upper().replace(',)',')')
     get_lob_sql = '''
     select  table_name,owner
-    from dba_lobs@mc_dblink
+    from dba_lobs@ops_dblink
     where owner in %s
     minus
     select table_name,owner
@@ -296,7 +296,7 @@ def view_vali(src_args,tag_args,sync_users,_REMOTE_COMMAND,_REMOTE_TAG_COMMAND):
     sync_users_str = str(tuple(sync_users)).upper().replace(',)',')')
     get_view_sql = '''
     select  v.view_name, v.owner,b.status
-    from dba_views@mc_dblink v, dba_objects@mc_dblink b
+    from dba_views@ops_dblink v, dba_objects@ops_dblink b
     where v.owner in %s
     and v.view_name = b.object_name
     minus
@@ -312,7 +312,7 @@ def view_vali(src_args,tag_args,sync_users,_REMOTE_COMMAND,_REMOTE_TAG_COMMAND):
 def dblink_vali(src_args,tag_args,_REMOTE_COMMAND,_REMOTE_TAG_COMMAND):
     get_dblink_sql = '''
     select object_name, owner,status
-  from dba_objects@mc_dblink
+  from dba_objects@ops_dblink
  where object_type = 'DATABASE LINK'
 minus
 select  object_name, owner,status
@@ -320,9 +320,9 @@ select  object_name, owner,status
  where object_type = 'DATABASE LINK';'''
     dblink_list = get_diff_obj_info(src_args,tag_args,get_dblink_sql,'DATABASE LINK',_REMOTE_COMMAND,_REMOTE_TAG_COMMAND)
     if dblink_list != []:
-        with open('mc_check_detail.txt','a+',encoding='utf-8') as file:
-            file.write('''\nINFO: DBLINK逻辑泵导出导入语句为:\nexpdp "'"/ as sysdba"'" include=db_link directory=MC_EXPDP full=y network_link=mc_dblink dumpfile=mc_dblink.dmp logfile=mc_dblink_expdp.log
-impdp "'"/ as sysdba"'" directory=MC_EXPDP dumpfile=mc_dblink.dmp logfile=mc_dblink_impdp.log\n''')
+        with open('ops_check_detail.txt','a+',encoding='utf-8') as file:
+            file.write('''\nINFO: DBLINK逻辑泵导出导入语句为:\nexpdp "'"/ as sysdba"'" include=db_link directory=ops_EXPDP full=y network_link=ops_dblink dumpfile=ops_dblink.dmp logfile=ops_dblink_expdp.log
+impdp "'"/ as sysdba"'" directory=ops_EXPDP dumpfile=ops_dblink.dmp logfile=ops_dblink_impdp.log\n''')
 
     return dblink_list
 
@@ -342,7 +342,7 @@ begin for cur IN
          d.default_tablespace,
          d.account_status,
          'create user ' || d.username || ' identified by ' || d.username || ' default tablespace ' || d.default_tablespace || ' TEMPORARY TABLESPACE ' || D.temporary_tablespace || ';' CREATE_USER, replace(to_char(DBMS_METADATA.GET_DDL('USER', D.username)), chr(10), '') create_USER1
-    FROM dba_users@mc_dblink d
+    FROM dba_users@ops_dblink d
     WHERE d.username IN %s) loop 
     INSERT INTO t_tmp_user_lhr (id, username, exec_sql, create_type) values (s_t_tmp_user_lhr.nextval, cur.username, cur.CREATE_USER, 'USER');
     
@@ -350,21 +350,21 @@ begin for cur IN
     'GRANT ' || d.privilege || ' TO ' || d.GRANTEE || ' WITH GRANT OPTION ;'
     ELSE 'GRANT ' || d.privilege || ' TO ' || d.GRANTEE || ';'
     END priv, 'DBA_SYS_PRIVS'
-    FROM dba_sys_privs@mc_dblink d
+    FROM dba_sys_privs@ops_dblink d
     WHERE D.GRANTEE = CUR.USERNAME;
 
     INSERT INTO t_tmp_user_lhr (id, username, exec_sql, create_type) SELECT s_t_tmp_user_lhr.nextval,cur.username,CASE WHEN D.ADMIN_OPTION = 'YES' THEN
     'GRANT ' || d.GRANTED_ROLE || ' TO ' || d.GRANTEE || ' WITH GRANT OPTION;'
     ELSE 'GRANT ' || d.GRANTED_ROLE || ' TO ' || d.GRANTEE || ';'
     END priv, 'DBA_ROLE_PRIVS'
-    FROM DBA_ROLE_PRIVS@mc_dblink d
+    FROM DBA_ROLE_PRIVS@ops_dblink d
     WHERE D.GRANTEE = CUR.USERNAME;
     
     INSERT INTO t_tmp_user_lhr (id, username, exec_sql, create_type) SELECT s_t_tmp_user_lhr.nextval,cur.username,CASE WHEN d.grantable = 'YES' THEN
     'GRANT ' || d.privilege || ' ON ' || d.owner || '.' || d.table_name || ' TO ' || d.GRANTEE || ' WITH GRANT OPTION ;'
     ELSE 'GRANT ' || d.privilege || ' ON ' || d.owner || '.' || d.table_name || ' TO ' || d.GRANTEE || ';'
     END priv, 'DBA_TAB_PRIVS'
-    FROM DBA_TAB_PRIVS@mc_dblink d
+    FROM DBA_TAB_PRIVS@ops_dblink d
     WHERE D.GRANTEE = CUR.USERNAME;
     
 END loop;
@@ -431,8 +431,8 @@ DROP sequence s_t_tmp_user_lhr_new;
     if role_res == []:
         print("\nINFO: 两端role权限一致")
     else:
-        print(f"\nINFO: 目标库缺失ROLE的dcl语句请在目标端查看 /tmp/mc_check.sql 文件 ")
-        ssh_input(tag_args,f'''echo "{''.join(role_res)}" >> /tmp/mc_check.sql''')
+        print(f"\nINFO: 目标库缺失ROLE的dcl语句请在目标端查看 /tmp/ops_check.sql 文件 ")
+        ssh_input(tag_args,f'''echo "{''.join(role_res)}" >> /tmp/ops_check.sql''')
 
     ssh_input(src_args,_REMOTE_COMMAND % drop_src_sql)
     ssh_input(tag_args,_REMOTE_TAG_COMMAND % drop_tag_sql)
@@ -441,13 +441,13 @@ DROP sequence s_t_tmp_user_lhr_new;
 # 无效对象比对
 @log
 def invaild_obj_vali(src_args,tag_args,_REMOTE_COMMAND,_REMOTE_TAG_COMMAND):
-    create_inv_obj_sql = "drop table t_tmp_invalid_object;\ncreate table t_tmp_invalid_object as select * from dba_objects@mc_dblink where status<>'VALID';"
+    create_inv_obj_sql = "drop table t_tmp_invalid_object;\ncreate table t_tmp_invalid_object as select * from dba_objects@ops_dblink where status<>'VALID';"
     utlrp_sql = "@?/rdbms/admin/utlrp.sql"
     get_inv_obj_sql = '''
     select  object_name, owner,object_type, status
   from dba_objects
  where status <> 'VALID'
-   and owner not in ('HZMCASSET')
+   and owner not in ('HZopsASSET')
    and object_name not in (select object_name from t_tmp_invalid_object);'''
     ssh_input(tag_args,_REMOTE_TAG_COMMAND % create_inv_obj_sql)
     print("\nINFO: 开始编译无效对象\n")
@@ -460,7 +460,7 @@ def invaild_obj_vali(src_args,tag_args,_REMOTE_COMMAND,_REMOTE_TAG_COMMAND):
 # 物化视图比对
 @log
 def mview_vali(src_args,tag_args,_REMOTE_COMMAND,_REMOTE_TAG_COMMAND):
-    get_src_mview_sql = "select MVIEW_NAME,owner from DBA_MVIEWS@mc_dblink;"
+    get_src_mview_sql = "select MVIEW_NAME,owner from DBA_MVIEWS@ops_dblink;"
     get_tag_mview_sql = "select MVIEW_NAME,owner from DBA_MVIEWS;"
 
     src_mview_res = ssh_input(tag_args,_REMOTE_TAG_COMMAND % get_src_mview_sql)
@@ -470,23 +470,23 @@ def mview_vali(src_args,tag_args,_REMOTE_COMMAND,_REMOTE_TAG_COMMAND):
     tag_obj_list = get_ssh_list(tag_mview_res)
     title =['物化视图名','物化视图用户名']
     if src_obj_list != [] :
-        print(f"\nINFO: 源端物化视图具体信息请查看本地 mc_check_detail.txt文件：")
+        print(f"\nINFO: 源端物化视图具体信息请查看本地 ops_check_detail.txt文件：")
         src_table_res = res_table(src_obj_list,title)
-        with open('mc_check_detail.txt','a+',encoding='utf-8') as file:
+        with open('ops_check_detail.txt','a+',encoding='utf-8') as file:
             file.write(f"\nINFO: 源端物化视图具体信息:\n{src_table_res}\n")
 
         ## 获取缺失对象的ddl语句
         for obj in src_obj_list:
             obj_name,obj_owner= obj
             ddl_res = get_ddl_info(src_args,obj_name,obj_owner,'MATERIALIZED_VIEW',_REMOTE_COMMAND)
-            ssh_input(tag_args,f'''echo '{ddl_res}' >> /tmp/mc_check.sql''')
-            print(f"\nINFO: 源端物化视图的ddl语句请在目标端查看 /tmp/mc_check.sql 文件 ")
+            ssh_input(tag_args,f'''echo '{ddl_res}' >> /tmp/ops_check.sql''')
+            print(f"\nINFO: 源端物化视图的ddl语句请在目标端查看 /tmp/ops_check.sql 文件 ")
     else:
         print(f"\nINFO: 源端不存在物化视图")
     if tag_obj_list != [] :
-        print(f"\nINFO: 目标端物化视图具体信息请查看本地 mc_check_detail.txt文件：")
+        print(f"\nINFO: 目标端物化视图具体信息请查看本地 ops_check_detail.txt文件：")
         tag_table_res = res_table(tag_obj_list,title)
-        with open('mc_check_detail.txt','a+',encoding='utf-8') as file:
+        with open('ops_check_detail.txt','a+',encoding='utf-8') as file:
             file.write(f"\nINFO: 目标端物化视图具体信息:\n{src_table_res}\n")
     else:
         print(f"\nINFO: 源端不存在物化视图")
@@ -548,8 +548,8 @@ end;
         slow_table_res = res_table(diff_list,title)
         print_res = f"\nINFO: 两端{owner}的表 {slow_tables_tmp} 表行数不一致:\n{slow_table_res}"
         print(print_res)
-        print(f"\nINFO: 相关信息已保存到本地 mc_check_detail_slow.txt文件：")
-        with open('mc_check_detail_slow.txt','a+',encoding='utf-8') as file:
+        print(f"\nINFO: 相关信息已保存到本地 ops_check_detail_slow.txt文件：")
+        with open('ops_check_detail_slow.txt','a+',encoding='utf-8') as file:
             file.write(print_res)
     return diff_list
 
@@ -562,8 +562,8 @@ def vali_check(src_args,tag_args,tag_other_args,vali_args,_REMOTE_COMMAND,_REMOT
         create_dbl_res = create_dblink(src_args,tag_args,vali_args,_REMOTE_COMMAND,_REMOTE_TAG_COMMAND)
         if create_dbl_res is not False:
             get_inconsist_obj(tag_args,sync_users,_REMOTE_TAG_COMMAND)
-            ssh_input(tag_args,'rm -rf /tmp/mc_check.sql')
-            os.system("echo '' >mc_check_detail.txt")
+            ssh_input(tag_args,'rm -rf /tmp/ops_check.sql')
+            os.system("echo '' >ops_check_detail.txt")
             index_vali(src_args,tag_args,_REMOTE_COMMAND,_REMOTE_TAG_COMMAND)
             function_vali(src_args,tag_args,_REMOTE_COMMAND,_REMOTE_TAG_COMMAND)
             proc_vali(src_args,tag_args,_REMOTE_COMMAND,_REMOTE_TAG_COMMAND)

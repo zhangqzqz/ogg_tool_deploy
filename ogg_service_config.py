@@ -31,9 +31,9 @@ def start_prc_srp(os_args,cmd_args,check_prc_list):
     start_ogg_txt = f'''sh date
 start mgr
 {start_prc_txt}'''
-    ssh_input(os_args,f"echo '{start_ogg_txt}' >{ogg_dir}/start_ogg_mc.txt")
-    ssh_input(os_args,f'''chown {ora_user} {ogg_dir}/start_ogg_mc.txt
-chmod +x {ogg_dir}/start_ogg_mc.txt
+    ssh_input(os_args,f"echo '{start_ogg_txt}' >{ogg_dir}/start_ogg_ops.txt")
+    ssh_input(os_args,f'''chown {ora_user} {ogg_dir}/start_ogg_ops.txt
+chmod +x {ogg_dir}/start_ogg_ops.txt
 ''')
     print("\nINFO:OGG进程状态获取完成\n")
 
@@ -42,14 +42,14 @@ chmod +x {ogg_dir}/start_ogg_mc.txt
 export ORACLE_SID=%s
 export LD_LIBRARY_PATH=%s:\$ORACLE_HOME/lib
 export LIBPATH=%s:\$ORACLE_HOME/lib 
-%s/ggsci paramfile %s/start_ogg_mc.txt>>%s/start_ogg_out.log
-EOF'>%s/start_ogg_mc.sh
+%s/ggsci paramfile %s/start_ogg_ops.txt>>%s/start_ogg_out.log
+EOF'>%s/start_ogg_ops.sh
 '''%(ora_user,sid,ogg_dir,ogg_dir,ogg_dir,ogg_dir,ogg_dir,ogg_dir)
 
     
     ssh_input(os_args,start_ogg_sh_txt)
-    ssh_input(os_args,f'''chown {ora_user} {ogg_dir}/start_ogg_mc.sh
-chmod +x {ogg_dir}/start_ogg_mc.sh
+    ssh_input(os_args,f'''chown {ora_user} {ogg_dir}/start_ogg_ops.sh
+chmod +x {ogg_dir}/start_ogg_ops.sh
 ''')
     print("\nINFO:OGG启动脚本生成完成\n")
 
@@ -59,7 +59,7 @@ chmod +x {ogg_dir}/start_ogg_mc.sh
 StartOggService(){
     sleep 2
     echo "start OggService..."
-    %s/start_ogg_mc.sh
+    %s/start_ogg_ops.sh
     echo "OggService start completed."
 }
  

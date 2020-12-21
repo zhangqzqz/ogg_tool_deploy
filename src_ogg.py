@@ -14,18 +14,18 @@ def src_ogg_mgr(src_args,tag_args,src_cmd_args,_REMOTE_COMMAND,_REMOTE_GGSCI_COM
     dir_sql = _REMOTE_COMMAND %"SELECT distinct(REVERSE(SUBSTR(REVERSE(d.file_name),INSTR(REVERSE(d.file_name),'/')+1))) \
                     from dba_data_files d,dual;"
     db_dir = ssh_input(src_args,dir_sql)[0].replace('\n','')
-    create_user_sql = '''create tablespace mc_odc_tps datafile '%s/mc_odc01.dbf' size 100M autoextend on;
-create user mc_odc identified by mc_odc default tablespace mc_odc_tps;
-GRANT CONNECT TO mc_odc;
-GRANT ALTER ANY TABLE TO mc_odc;
-GRANT ALTER SESSION TO mc_odc;
-GRANT CREATE SESSION TO mc_odc;
-GRANT FLASHBACK ANY TABLE TO mc_odc;
-GRANT SELECT ANY DICTIONARY TO mc_odc;
-GRANT SELECT ANY TABLE TO mc_odc;
-GRANT RESOURCE TO mc_odc;
-GRANT DBA TO mc_odc;
-alter user mc_odc quota unlimited on users;
+    create_user_sql = '''create tablespace ops_odc_tps datafile '%s/ops_odc01.dbf' size 100M autoextend on;
+create user ops_odc identified by ops_odc default tablespace ops_odc_tps;
+GRANT CONNECT TO ops_odc;
+GRANT ALTER ANY TABLE TO ops_odc;
+GRANT ALTER SESSION TO ops_odc;
+GRANT CREATE SESSION TO ops_odc;
+GRANT FLASHBACK ANY TABLE TO ops_odc;
+GRANT SELECT ANY DICTIONARY TO ops_odc;
+GRANT SELECT ANY TABLE TO ops_odc;
+GRANT RESOURCE TO ops_odc;
+GRANT DBA TO ops_odc;
+alter user ops_odc quota unlimited on users;
 '''%db_dir
     ssh_input(src_args,_REMOTE_COMMAND % create_user_sql)
 
@@ -43,11 +43,11 @@ rm -f %s/dirprm/mgr.prm
 rm -f %s/GLOBALS
 echo 'port 7809
 DYNAMICPORTLIST 7800-7810
-PURGEOLDEXTRACTS ./dirdat/mc*, USECHECKPOINTS, MINKEEPHOURS 24
+PURGEOLDEXTRACTS ./dirdat/%s*, USECHECKPOINTS, MINKEEPHOURS 24
 autorestart extract * retries 10 waitminutes 10'>>%s/dirprm/mgr.prm
-echo 'GGSCHEMA mc_odc
-CHECKPOINTTABLE mc_odc.ggs_checkpoint '>>%s/GLOBALS
-EOF'''%(src_cmd_args[0],src_cmd_args[1],src_cmd_args[2],src_cmd_args[2],src_cmd_args[2],src_cmd_args[2])
+echo 'GGSCHEMA ops_odc
+CHECKPOINTTABLE ops_odc.ggs_checkpoint '>>%s/GLOBALS
+EOF'''%(src_cmd_args[0],src_cmd_args[1],src_cmd_args[2],src_cmd_args[2],src_cmd_args[6],src_cmd_args[2],src_cmd_args[2])
     ssh_input(src_args,create_mgr_cmd)
     start_mgr_cmd = _REMOTE_GGSCI_COMMAND % "start mgr"
     start_mgr_res = ssh_input(src_args,start_mgr_cmd)
@@ -59,20 +59,20 @@ EOF'''%(src_cmd_args[0],src_cmd_args[1],src_cmd_args[2],src_cmd_args[2],src_cmd_
 def src_ogg_ddl(src_args,tag_args,src_cmd_args,_REMOTE_COMMAND,_REMOTE_GGSCI_COMMAND):
     ddl_y_n = input("You should turn off all seesions of oracle when you run the sql of ddl .\nDo you want to continue? Y/N")
     if ddl_y_n.upper()=='Y':
-        # grant to mc_odc for ddl setup
-        grant_ddl_sql = _REMOTE_COMMAND % '''grant create any table to mc_odc;
-grant create any view to mc_odc;
-grant create any procedure to mc_odc;
-grant create any sequence to mc_odc;
-grant create any index to mc_odc;
-grant create any trigger to mc_odc;
-grant create any view to mc_odc;
-GRANT EXECUTE ON UTL_FILE TO mc_odc;'''
+        # grant to ops_odc for ddl setup
+        grant_ddl_sql = _REMOTE_COMMAND % '''grant create any table to ops_odc;
+grant create any view to ops_odc;
+grant create any procedure to ops_odc;
+grant create any sequence to ops_odc;
+grant create any index to ops_odc;
+grant create any trigger to ops_odc;
+grant create any view to ops_odc;
+GRANT EXECUTE ON UTL_FILE TO ops_odc;'''
         ssh_input(src_args,grant_ddl_sql)
 
         #run the sql of marker_setup
         print("######Run the script of marker_setup.")
-        run_marker_setup = _REMOTE_COMMAND % "@%s/marker_setup\nmc_odc\n" % src_cmd_args[2]
+        run_marker_setup = _REMOTE_COMMAND % "@%s/marker_setup\nops_odc\n" % src_cmd_args[2]
         run_marker_res = ssh_input(src_args,run_marker_setup)
         print(''.join(run_marker_res))
 
@@ -93,7 +93,7 @@ GRANT EXECUTE ON UTL_FILE TO mc_odc;'''
                 do_off_bin = ''
                 return "recyclebin"
         print("######Run the script of ddl_setup.")
-        run_ddl_setup = _REMOTE_COMMAND % "@%s/ddl_setup\nmc_odc\n" % src_cmd_args[2]
+        run_ddl_setup = _REMOTE_COMMAND % "@%s/ddl_setup\nops_odc\n" % src_cmd_args[2]
         run_ddl_res = ssh_input(src_args,run_ddl_setup)
         print(''.join(run_ddl_res))
 
@@ -102,18 +102,18 @@ GRANT EXECUTE ON UTL_FILE TO mc_odc;'''
             run_remove_ddl = _REMOTE_COMMAND % "@%s/ddl_remove\n%s\n" % (src_cmd_args[2],exists_user)
             run_remove_res = ssh_input(src_args,run_remove_ddl)
             print(''.join(run_remove_res))
-            run_ddl_setup = _REMOTE_COMMAND % "@%s/ddl_setup\nmc_odc\n" % src_cmd_args[2]
+            run_ddl_setup = _REMOTE_COMMAND % "@%s/ddl_setup\nops_odc\n" % src_cmd_args[2]
             run_ddl_res = ssh_input(src_args,run_ddl_setup)
             print(''.join(run_ddl_res))
         
         #run the sql of role_setup
         print("######Run the script of role_setup.")
-        run_role_setup = _REMOTE_COMMAND % "@%s/role_setup\nmc_odc\n" % src_cmd_args[2]
+        run_role_setup = _REMOTE_COMMAND % "@%s/role_setup\nops_odc\n" % src_cmd_args[2]
         run_role_res = ssh_input(src_args,run_role_setup)
         print(''.join(run_role_res))
-        grant_mc_odc_sql = _REMOTE_COMMAND % "GRANT GGS_GGSUSER_ROLE TO mc_odc;" 
-        ssh_input(src_args,grant_mc_odc_sql)
-        print("GRANT GGS_GGSUSER_ROLE TO mc_odc\nGrant role to mc_odc complete.")
+        grant_ops_odc_sql = _REMOTE_COMMAND % "GRANT GGS_GGSUSER_ROLE TO ops_odc;" 
+        ssh_input(src_args,grant_ops_odc_sql)
+        print("GRANT GGS_GGSUSER_ROLE TO ops_odc\nGrant role to ops_odc complete.")
 
         #run the sql of ddl_enable
         print("######Run the script of ddl_enable.")
@@ -131,7 +131,7 @@ GRANT EXECUTE ON UTL_FILE TO mc_odc;'''
 
         #run the sql of ddl_pin
         print("######Run the script of ddl_pin.")
-        run_ddl_pin = _REMOTE_COMMAND % "@%s/ddl_pin\nmc_odc\nmc_odc" % src_cmd_args[2]
+        run_ddl_pin = _REMOTE_COMMAND % "@%s/ddl_pin\nops_odc\nops_odc" % src_cmd_args[2]
         run_ddl_pin = ssh_input(src_args,run_ddl_pin)
         print(''.join(run_ddl_pin))
         print('DDL pin script complete')
@@ -142,7 +142,7 @@ GRANT EXECUTE ON UTL_FILE TO mc_odc;'''
     # add supplement log for table
     print("######Add supplement log for table.")
     add_sup_y_n = input("Do you want to add supplement log now? y/n ")
-    add_sup_cmd = 'dblogin userid mc_odc password mc_odc\nadd trandata '+ src_cmd_args[3].replace(',',';\nadd trandata ')
+    add_sup_cmd = 'dblogin userid ops_odc password ops_odc\nadd trandata '+ src_cmd_args[3].replace(',',';\nadd trandata ')
 
     if add_sup_y_n.upper()=='Y': 
         add_count = 0
@@ -150,7 +150,7 @@ GRANT EXECUTE ON UTL_FILE TO mc_odc;'''
             ssh_input(src_args,_REMOTE_GGSCI_COMMAND %  add_sup_cmd)
             add_count +=1
             time.sleep(10)
-        info_sup_cmd = 'dblogin userid mc_odc password mc_odc\ninfo trandata '+ src_cmd_args[3].replace(',',';\ninfo trandata ')
+        info_sup_cmd = 'dblogin userid ops_odc password ops_odc\ninfo trandata '+ src_cmd_args[3].replace(',',';\ninfo trandata ')
         info_sup_res = ssh_input(src_args,_REMOTE_GGSCI_COMMAND % info_sup_cmd)
 
         disable_sup_res = [res for res in info_sup_res if 'disable' in res]
@@ -169,7 +169,7 @@ GRANT EXECUTE ON UTL_FILE TO mc_odc;'''
 def src_ogg_prc_single(src_args,tag_args,src_cmd_args,_REMOTE_COMMAND,_REMOTE_GGSCI_COMMAND,do_off_bin):
     # create the process extract and start it.
     print("######Create process extract.")
-    add_ext_cmd = _REMOTE_GGSCI_COMMAND % "add extract mc_ext tranlog begin now\nadd exttrail ./dirdat/mc extract mc_ext"
+    add_ext_cmd = _REMOTE_GGSCI_COMMAND % "add extract %s_ext tranlog begin now\nadd exttrail ./dirdat/%s extract %s_ext"%(src_cmd_args[6],src_cmd_args[6],src_cmd_args[6])
     add_ext_res = ssh_input(src_args,add_ext_cmd)
     print(''.join(add_ext_res))
 
@@ -188,17 +188,17 @@ def src_ogg_prc_single(src_args,tag_args,src_cmd_args,_REMOTE_COMMAND,_REMOTE_GG
     edit_ext_cmd = '''
 su - %s <<EOF
 export ORACLE_SID=%s
-rm -f %s/dirprm/mc_ext.prm
-echo 'extract mc_ext
+rm -f %s/dirprm/%s_ext.prm
+echo 'extract %s_ext
 setenv (NLS_LANG="SIMPLIFIED CHINESE_CHINA.ZHS16GBK")
-userid mc_odc,password mc_odc
-exttrail ./dirdat/mc
+userid ops_odc,password ops_odc
+exttrail ./dirdat/%s
 tranlogoptions altarchivelogdest %s
 FETCHOPTIONS FETCHPKUPDATECOLS
 %s
 %s
-'>>%s/dirprm/mc_ext.prm
-EOF'''%(src_cmd_args[0],src_cmd_args[1],src_cmd_args[2],arch_dest,ddl_obj_cmd,table_obj_cmd,src_cmd_args[2])
+'>>%s/dirprm/%s_ext.prm
+EOF'''%(src_cmd_args[0],src_cmd_args[1],src_cmd_args[2],src_cmd_args[6],src_cmd_args[6],src_cmd_args[6],arch_dest,ddl_obj_cmd,table_obj_cmd,src_cmd_args[2],src_cmd_args[6])
 
     ssh_input(src_args,edit_ext_cmd)
 
@@ -206,22 +206,22 @@ EOF'''%(src_cmd_args[0],src_cmd_args[1],src_cmd_args[2],arch_dest,ddl_obj_cmd,ta
     # create the process dmp 
 
     print("######Create process dmp.")
-    add_dmp_cmd = _REMOTE_GGSCI_COMMAND % "add extract mc_dmp EXTTRAILSOURCE ./dirdat/mc\nADD RMTTRAIL ./dirdat/mc, EXTRACT mc_dmp"
+    add_dmp_cmd = _REMOTE_GGSCI_COMMAND % "add extract %s_dmp EXTTRAILSOURCE ./dirdat/%s\nADD RMTTRAIL ./dirdat/%s, EXTRACT %s_dmp"%(src_cmd_args[6],src_cmd_args[6],src_cmd_args[6],src_cmd_args[6])
     add_dmp_res = ssh_input(src_args,add_dmp_cmd)
     print(''.join(add_dmp_res))
 
     edit_dmp_cmd = '''
 su - %s <<EOF
 export ORACLE_SID=%s
-rm -f %s/dirprm/mc_dmp.prm
-echo 'extract mc_dmp
-userid mc_odc,password mc_odc
+rm -f %s/dirprm/%s_dmp.prm
+echo 'extract %s_dmp
+userid ops_odc,password ops_odc
 rmthost %s, mgrport 7809
-rmttrail ./dirdat/mc
+rmttrail ./dirdat/%s
 passthru
 %s
-'>>%s/dirprm/mc_dmp.prm
-EOF'''%(src_cmd_args[0],src_cmd_args[1],src_cmd_args[2],tag_args[0],table_obj_cmd,src_cmd_args[2])
+'>>%s/dirprm/%s_dmp.prm
+EOF'''%(src_cmd_args[0],src_cmd_args[1],src_cmd_args[2],src_cmd_args[6],src_cmd_args[6],tag_args[0],src_cmd_args[6],table_obj_cmd,src_cmd_args[2],src_cmd_args[6])
 
     ssh_input(src_args,edit_dmp_cmd)
 
@@ -241,7 +241,7 @@ def src_ogg_prc_rac(src_args,tag_args,src_cmd_args,_REMOTE_COMMAND,_REMOTE_GGSCI
 
 #     # create the process extract and start it.
     print("######Create process extract.")
-    add_ext_cmd = _REMOTE_GGSCI_COMMAND % f"add extract mc_ext tranlog  threads {inst_num} begin now\nadd exttrail ./dirdat/mc extract mc_ext"
+    add_ext_cmd = _REMOTE_GGSCI_COMMAND % f"add extract {src_cmd_args[6]}_ext tranlog  threads {inst_num} begin now\nadd exttrail ./dirdat/{src_cmd_args[6]} extract {src_cmd_args[6]}_ext"
     add_ext_res = ssh_input(src_args,add_ext_cmd)
     print(''.join(add_ext_res))
 
@@ -262,17 +262,17 @@ def src_ogg_prc_rac(src_args,tag_args,src_cmd_args,_REMOTE_COMMAND,_REMOTE_GGSCI
         edit_ext_cmd = '''
 su - %s <<EOF
 export ORACLE_SID=%s
-rm -f %s/dirprm/mc_ext.prm
-echo 'extract mc_ext
+rm -f %s/dirprm/%s_ext.prm
+echo 'extract %s_ext
 setenv (NLS_LANG="SIMPLIFIED CHINESE_CHINA.ZHS16GBK")
-userid mc_odc,password mc_odc
-exttrail ./dirdat/mc
+userid ops_odc,password ops_odc
+exttrail ./dirdat/%s
 tranlogoptions dblogreader
 FETCHOPTIONS FETCHPKUPDATECOLS
 %s
 %s
-'>>%s/dirprm/mc_ext.prm
-EOF'''%(src_cmd_args[0],src_cmd_args[1],src_cmd_args[2],ddl_obj_cmd,table_obj_cmd,src_cmd_args[2])
+'>>%s/dirprm/%s_ext.prm
+EOF'''%(src_cmd_args[0],src_cmd_args[1],src_cmd_args[2],src_cmd_args[6],src_cmd_args[6],src_cmd_args[6],ddl_obj_cmd,table_obj_cmd,src_cmd_args[2],src_cmd_args[6])
         ssh_input(src_args,edit_ext_cmd)
 
     # if version is 10g rac    
@@ -289,7 +289,7 @@ EOF'''%(src_cmd_args[0],src_cmd_args[1],src_cmd_args[2],ddl_obj_cmd,table_obj_cm
         modify_tns_cmd = f'''su - {src_cmd_args[0]}<<EOF
     mv \$ORACLE_HOME/network/admin/tnsnames.ora \$ORACLE_HOME/network/admin/tnsnames.ora{modify_time}
     echo '{get_tns_txt}
-    MC_ASM =
+    ops_ASM =
     (DESCRIPTION =
         (ADDRESS = (PROTOCOL = TCP)(HOST = {src_args[0]})(PORT = 1521))
         (CONNECT_DATA =
@@ -300,7 +300,7 @@ EOF'''%(src_cmd_args[0],src_cmd_args[1],src_cmd_args[2],ddl_obj_cmd,table_obj_cm
     )'>>\$ORACLE_HOME/network/admin/tnsnames.ora
     EOF'''
         ssh_input(src_args,modify_tns_cmd)
-        check_tns = ''.join(ssh_input(src_args,f'su - {src_cmd_args[0]}<<EOF\ntnsping mc_asm\nEOF'))
+        check_tns = ''.join(ssh_input(src_args,f'su - {src_cmd_args[0]}<<EOF\ntnsping ops_asm\nEOF'))
         print(check_tns)
         if 'OK' not in check_tns:
             print(check_tns)
@@ -310,18 +310,18 @@ EOF'''%(src_cmd_args[0],src_cmd_args[1],src_cmd_args[2],ddl_obj_cmd,table_obj_cm
         edit_ext_cmd = '''
         su - %s <<EOF
         export ORACLE_SID=%s
-        rm -f %s/dirprm/mc_ext.prm
-        echo 'extract mc_ext
+        rm -f %s/dirprm/%s_ext.prm
+        echo 'extract %s_ext
         setenv (NLS_LANG="SIMPLIFIED CHINESE_CHINA.ZHS16GBK")
-        userid mc_odc,password mc_odc
-        exttrail ./dirdat/mc
+        userid ops_odc,password ops_odc
+        exttrail ./dirdat/%s
         tranlogoptions altarchivelogdest %s
-        tranlogoptions asmuser sys@mc_asm, asmpassword %s
+        tranlogoptions asmuser sys@ops_asm, asmpassword %s
         FETCHOPTIONS FETCHPKUPDATECOLS
         %s
         %s
-        '>>%s/dirprm/mc_ext.prm
-        EOF'''%(src_cmd_args[0],src_cmd_args[1],src_cmd_args[2],arch_dest,src_cmd_args[4],ddl_obj_cmd,table_obj_cmd,src_cmd_args[2])
+        '>>%s/dirprm/%s_ext.prm
+        EOF'''%(src_cmd_args[0],src_cmd_args[1],src_cmd_args[2],src_cmd_args[6],src_cmd_args[6],src_cmd_args[6],arch_dest,src_cmd_args[4],ddl_obj_cmd,table_obj_cmd,src_cmd_args[2],src_cmd_args[6])
     else:
         print("Please check the database version.")
         os._exit(0)
@@ -329,22 +329,22 @@ EOF'''%(src_cmd_args[0],src_cmd_args[1],src_cmd_args[2],ddl_obj_cmd,table_obj_cm
         # create the process dmp 
         
     print("######Create process dmp.")
-    add_dmp_cmd = _REMOTE_GGSCI_COMMAND % "add extract mc_dmp EXTTRAILSOURCE ./dirdat/mc\nADD RMTTRAIL ./dirdat/mc, EXTRACT mc_dmp"
+    add_dmp_cmd = _REMOTE_GGSCI_COMMAND % "add extract ops_dmp EXTTRAILSOURCE ./dirdat/ops\nADD RMTTRAIL ./dirdat/ops, EXTRACT ops_dmp"
     add_dmp_res = ssh_input(src_args,add_dmp_cmd)
     print(''.join(add_dmp_res))
 
     edit_dmp_cmd = '''
 su - %s <<EOF
 export ORACLE_SID=%s
-rm -f %s/dirprm/mc_dmp.prm
-echo 'extract mc_dmp
-userid mc_odc,password mc_odc
+rm -f %s/dirprm/%s_dmp.prm
+echo 'extract %s_dmp
+userid ops_odc,password ops_odc
 rmthost %s, mgrport 7809
-rmttrail ./dirdat/mc
+rmttrail ./dirdat/%s
 passthru
 %s
-'>>%s/dirprm/mc_dmp.prm
-EOF'''%(src_cmd_args[0],src_cmd_args[1],src_cmd_args[2],tag_args[0],table_obj_cmd,src_cmd_args[2])
+'>>%s/dirprm/%s_dmp.prm
+EOF'''%(src_cmd_args[0],src_cmd_args[1],src_cmd_args[2],src_cmd_args[6],src_cmd_args[6],tag_args[0],src_cmd_args[6],table_obj_cmd,src_cmd_args[2],src_cmd_args[6])
 
     ssh_input(src_args,edit_dmp_cmd)
 

@@ -18,7 +18,7 @@ def db_check(args,cmd_args,_REMOTE_COMMAND):
                 ('ANYDATA','ANYDATASET','ANYTYPE','BFILE','BINARY_INTEGER','MLSLABEL','PLS_INTEGER','TIMEZONE_ABBR','TIMEZONE_REGION','URITYPE,UROWID');"%schemas
     check_mtr_view_sql = " select object_name,owner from dba_objects where object_type='MATERIALIZED VIEW';"
     check_tri_ogg_sql = "select TRIGGER_NAME from dba_triggers where TRIGGER_NAME='GGS_DDL_TRIGGER_BEFORE';"
-    check_mgr_user_sql = "select USERNAME from dba_users where username='MC_ODC';"
+    check_mgr_user_sql = "select USERNAME from dba_users where username='OPS_ODC';"
 
 
    
@@ -92,14 +92,14 @@ def db_check(args,cmd_args,_REMOTE_COMMAND):
     if res_mgr_user ==[]:
         print ("No manager user for  ogg found.\n")
     else:
-        print("The manager user for  ogg named 'MC_ODC' exsist.\n")
+        print("The manager user for  ogg named 'OPS_ODC' exsist.\n")
         drop_user_y_n = input("Do you want to drop the user now? Y/N")
         if drop_user_y_n.upper()=='Y':
-             drop_user_sql = _REMOTE_COMMAND % "drop user mc_odc cascade;"
+             drop_user_sql = _REMOTE_COMMAND % "drop user ops_odc cascade;"
              res_drop_user = ssh_input(args,drop_user_sql)
              print(''.join(res_drop_user))
         else:
-            print("If you want to drop the user by yourself,the sql is:\n<drop user mc_odc cascade;>")
+            print("If you want to drop the user by yourself,the sql is:\n<drop user ops_odc cascade;>")
 
 
     return 1
